@@ -1,12 +1,17 @@
 package com.smkmambaululum.administrasi;
 
 import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.View;
 import android.webkit.CookieManager;
+import android.webkit.MimeTypeMap;
 import android.webkit.PermissionRequest;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -22,76 +27,63 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 public class MainActivity extends AppCompatActivity {
 
-    // URL Google Apps Script
+    // ============================================================
+    // URL GOOGLE APPS SCRIPT
+    // ============================================================
+
     private static final String APP_URL =
             "https://script.google.com/macros/s/AKfycbyUFOlAbGQBZIhDNUKljStXzisIqv1WOSe4OY3H2JjSejKZ7kKw8DCIkLGaqxWI9eS9MQ/exec";
 
-    // Request code
     private static final int FILE_CHOOSER_REQUEST = 1001;
-    private static final int CAMERA_REQUEST = 1002;
 
-    // WebView
     private WebView webView;
-
-    // SwipeRefreshLayout tetap digunakan pada layout,
-    // tetapi fitur swipe-to-refresh DINONAKTIFKAN.
     private SwipeRefreshLayout swipeRefresh;
-
-    // Callback untuk upload file
     private ValueCallback<Uri[]> fileCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Memuat layout utama
         setContentView(R.layout.activity_main);
 
-        // Menghubungkan komponen dari XML
+        // ========================================================
+        // HUBUNGKAN KOMPONEN
+        // ========================================================
+
         swipeRefresh = findViewById(R.id.swipeRefresh);
         webView = findViewById(R.id.webView);
 
-        // =========================================================
+        // ========================================================
         // KONFIGURASI WEBVIEW
-        // =========================================================
+        // ========================================================
 
         WebSettings settings = webView.getSettings();
 
-        // Aktifkan JavaScript
         settings.setJavaScriptEnabled(true);
-
-        // DOM Storage diperlukan oleh banyak aplikasi web modern
         settings.setDomStorageEnabled(true);
-
-        // Database WebView
         settings.setDatabaseEnabled(true);
 
-        // Izinkan akses file
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
 
-        // Nonaktifkan zoom
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
-        // Izinkan JavaScript membuka window
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-
-        // Izinkan media berjalan tanpa gesture tambahan
         settings.setMediaPlaybackRequiresUserGesture(false);
 
-        // Tambahkan identitas aplikasi ke User Agent
         settings.setUserAgentString(
                 settings.getUserAgentString()
                         + " SMK-MU-AndroidApp/1.0"
         );
 
-        // =========================================================
+        // ========================================================
         // COOKIE
-        // =========================================================
+        // ========================================================
 
-        CookieManager cookieManager = CookieManager.getInstance();
+        CookieManager cookieManager =
+                CookieManager.getInstance();
 
         cookieManager.setAcceptCookie(true);
 
@@ -100,9 +92,9 @@ public class MainActivity extends AppCompatActivity {
                 true
         );
 
-        // =========================================================
+        // ========================================================
         // WEBVIEW CLIENT
-        // =========================================================
+        // ========================================================
 
         webView.setWebViewClient(new WebViewClient() {
 
@@ -116,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
 
                 String scheme = uri.getScheme();
 
-                // Link HTTP/HTTPS tetap dibuka di dalam WebView
+                // HTTP / HTTPS tetap dibuka di WebView
                 if (scheme != null &&
                         (scheme.equals("http")
                                 || scheme.equals("https"))) {
@@ -124,33 +116,34 @@ public class MainActivity extends AppCompatActivity {
                     return false;
                 }
 
-                // Link selain HTTP/HTTPS dibuka menggunakan aplikasi
-                // yang sesuai di Android.
+                // Link selain HTTP/HTTPS
+                // dibuka menggunakan aplikasi Android
                 try {
 
                     Intent intent =
-                            new Intent(Intent.ACTION_VIEW, uri);
+                            new Intent(
+                                    Intent.ACTION_VIEW,
+                                    uri
+                            );
 
                     startActivity(intent);
 
                 } catch (Exception ignored) {
-                    // Tidak melakukan apa-apa jika tidak ada
-                    // aplikasi yang dapat menangani link tersebut.
                 }
 
                 return true;
             }
         });
 
-        // =========================================================
+        // ========================================================
         // WEB CHROME CLIENT
-        // =========================================================
+        // ========================================================
 
         webView.setWebChromeClient(new WebChromeClient() {
 
-            // -----------------------------------------------------
+            // ====================================================
             // UPLOAD FILE
-            // -----------------------------------------------------
+            // ====================================================
 
             @Override
             public boolean onShowFileChooser(
@@ -159,8 +152,6 @@ public class MainActivity extends AppCompatActivity {
                     FileChooserParams fileChooserParams
             ) {
 
-                // Jika masih ada callback sebelumnya,
-                // batalkan callback tersebut.
                 if (fileCallback != null) {
                     fileCallback.onReceiveValue(null);
                 }
@@ -193,9 +184,9 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
-            // -----------------------------------------------------
+            // ====================================================
             // PERMISSION WEBVIEW
-            // -----------------------------------------------------
+            // ====================================================
 
             @Override
             public void onPermissionRequest(
@@ -214,41 +205,184 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // =========================================================
-        // PULL-TO-REFRESH DINONAKTIFKAN
-        // =========================================================
+        // ========================================================
+        // DOWNLOAD FILE KE HP ANDROID
+        // ========================================================
         //
-        // Sebelumnya terdapat:
+        // Ini bagian BARU.
         //
-        // swipeRefresh.setOnRefreshListener(
-        //     () -> webView.reload()
-        // );
+        // Ketika website mengirim file untuk didownload,
+        // WebView akan menyerahkannya kepada Android DownloadManager.
         //
-        // dan:
+        // File akan masuk ke:
         //
-        // webView.setOnScrollChangeListener(...);
+        // Penyimpanan Internal
+        //     └── Download
         //
-        // Kedua kode tersebut DIHAPUS agar ketika pengguna
-        // melakukan scroll, halaman tidak melakukan refresh.
-        //
-        // =========================================================
+        // ========================================================
+
+        webView.setDownloadListener(
+                (url, userAgent, contentDisposition, mimeType, contentLength) -> {
+
+                    try {
+
+                        // Ambil cookie WebView agar file yang membutuhkan
+                        // session/login tetap dapat diakses.
+                        String cookies =
+                                CookieManager
+                                        .getInstance()
+                                        .getCookie(url);
+
+                        // Menentukan nama file
+                        String fileName =
+                                URLUtil.guessFileName(
+                                        url,
+                                        contentDisposition,
+                                        mimeType
+                                );
+
+                        // Jika nama file kosong
+                        if (fileName == null
+                                || fileName.trim().isEmpty()) {
+
+                            String extension = "";
+
+                            if (mimeType != null) {
+
+                                String ext =
+                                        MimeTypeMap
+                                                .getSingleton()
+                                                .getExtensionFromMimeType(
+                                                        mimeType
+                                                );
+
+                                if (ext != null
+                                        && !ext.isEmpty()) {
+
+                                    extension = "." + ext;
+                                }
+                            }
+
+                            fileName =
+                                    "download"
+                                            + extension;
+                        }
+
+                        // =================================================
+                        // DOWNLOAD MANAGER ANDROID
+                        // =================================================
+
+                        DownloadManager.Request request =
+                                new DownloadManager.Request(
+                                        Uri.parse(url)
+                                );
+
+                        // Header penting agar Apps Script/Google
+                        // mengenali session WebView.
+                        if (userAgent != null) {
+
+                            request.addRequestHeader(
+                                    "User-Agent",
+                                    userAgent
+                            );
+                        }
+
+                        if (cookies != null
+                                && !cookies.isEmpty()) {
+
+                            request.addRequestHeader(
+                                    "Cookie",
+                                    cookies
+                            );
+                        }
+
+                        // Jenis file
+                        if (mimeType != null
+                                && !mimeType.isEmpty()) {
+
+                            request.setMimeType(mimeType);
+                        }
+
+                        // Judul notifikasi
+                        request.setTitle(fileName);
+
+                        request.setDescription(
+                                "Mengunduh file dari Administrasi SMK Mambaul Ulum"
+                        );
+
+                        // Tampilkan notifikasi proses download
+                        request.setNotificationVisibility(
+                                DownloadManager
+                                        .Request
+                                        .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                        );
+
+                        // =================================================
+                        // SIMPAN KE FOLDER DOWNLOAD ANDROID
+                        // =================================================
+
+                        request.setDestinationInExternalPublicDir(
+                                Environment.DIRECTORY_DOWNLOADS,
+                                fileName
+                        );
+
+                        // Masukkan ke Android Download Manager
+                        DownloadManager downloadManager =
+                                (DownloadManager)
+                                        getSystemService(
+                                                Context.DOWNLOAD_SERVICE
+                                        );
+
+                        if (downloadManager != null) {
+
+                            downloadManager.enqueue(request);
+
+                            Toast.makeText(
+                                    MainActivity.this,
+                                    "Download dimulai...",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+
+                        } else {
+
+                            Toast.makeText(
+                                    MainActivity.this,
+                                    "Download Manager Android tidak tersedia",
+                                    Toast.LENGTH_LONG
+                            ).show();
+                        }
+
+                    } catch (Exception e) {
+
+                        Toast.makeText(
+                                MainActivity.this,
+                                "Gagal mengunduh file: "
+                                        + e.getMessage(),
+                                Toast.LENGTH_LONG
+                        ).show();
+                    }
+                });
+
+        // ========================================================
+        // MATIKAN PULL-TO-REFRESH
+        // ========================================================
 
         swipeRefresh.setEnabled(false);
 
-        // Hilangkan efek overscroll WebView
+        // Hilangkan efek overscroll
         webView.setOverScrollMode(
                 View.OVER_SCROLL_NEVER
         );
 
-        // =========================================================
-        // LOAD GOOGLE APPS SCRIPT
-        // =========================================================
+        // ========================================================
+        // BUKA GOOGLE APPS SCRIPT
+        // ========================================================
 
         webView.loadUrl(APP_URL);
 
-        // =========================================================
+        // ========================================================
         // TOMBOL BACK ANDROID
-        // =========================================================
+        // ========================================================
 
         getOnBackPressedDispatcher().addCallback(
                 this,
@@ -257,16 +391,12 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void handleOnBackPressed() {
 
-                        // Jika WebView memiliki history,
-                        // kembali ke halaman sebelumnya.
                         if (webView.canGoBack()) {
 
                             webView.goBack();
 
                         } else {
 
-                            // Jika tidak ada history,
-                            // tutup aplikasi.
                             finish();
                         }
                     }
@@ -274,9 +404,9 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    // =============================================================
+    // ============================================================
     // HASIL PEMILIHAN FILE
-    // =============================================================
+    // ============================================================
 
     @Override
     protected void onActivityResult(
@@ -291,24 +421,20 @@ public class MainActivity extends AppCompatActivity {
                 data
         );
 
-        // Pastikan ini merupakan hasil dari file chooser
         if (requestCode == FILE_CHOOSER_REQUEST
                 && fileCallback != null) {
 
             Uri[] results = null;
 
-            // Jika pengguna berhasil memilih file
             if (resultCode == Activity.RESULT_OK
                     && data != null) {
 
-                // -------------------------------------------------
                 // MULTIPLE FILE
-                // -------------------------------------------------
-
                 if (data.getClipData() != null) {
 
                     int count =
-                            data.getClipData().getItemCount();
+                            data.getClipData()
+                                    .getItemCount();
 
                     results = new Uri[count];
 
@@ -322,10 +448,7 @@ public class MainActivity extends AppCompatActivity {
 
                 }
 
-                // -------------------------------------------------
                 // SINGLE FILE
-                // -------------------------------------------------
-
                 else if (data.getData() != null) {
 
                     results = new Uri[]{
@@ -334,27 +457,23 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            // Kirim hasil file ke WebView
             fileCallback.onReceiveValue(results);
 
-            // Reset callback
             fileCallback = null;
         }
     }
 
-    // =============================================================
-    // KETIKA ACTIVITY DIHANCURKAN
-    // =============================================================
+    // ============================================================
+    // HANCURKAN WEBVIEW
+    // ============================================================
 
     @Override
     protected void onDestroy() {
 
         if (webView != null) {
 
-            // Hentikan proses loading
             webView.stopLoading();
 
-            // Hancurkan WebView
             webView.destroy();
         }
 
