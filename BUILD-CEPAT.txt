@@ -1,0 +1,8 @@
+BUILD PALING MUDAH
+
+Jika memakai Android Studio:
+1. Open folder project.
+2. Build > Build APK(s).
+3. Ambil app/build/outputs/apk/debug/app-debug.apk
+
+Jika ingin tanpa Android Studio, upload project ke GitHub. Workflow .github/workflows/build-apk.yml akan membangun APK otomatis.
